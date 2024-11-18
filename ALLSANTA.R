@@ -29,7 +29,42 @@ gift_receive_list <- paste0("gift_receive_type (",
 # Matches -----------------------------------------------------------------
 
 
+Input CSV
+- Name
+- What they give (cols, TF)
+- What they get (cols, TF)
+- All sources in a list w commas to break
+- Notes on give prefs
 
+Script (R)
+- Any excludes?
+    - Create a new df (list w commas to break), this person won’t be matched with any names in that column
+- Create a new df (empty) tracker
+    - Cols Santa -> giftee
+- Create a new df  (all Santas), new df (all giftees)
+- Create a df where col 1 is Santa col 2 is all compatible (based on give receive align and not in blacklist
+
+- For row in compatinle: for thing in list, if thing in [any other row] and give[index] true and receive[index]true, new df remove row where x2 and append to tracker
+    - And remove from compatible, name and row
+    - Probably go in fandom order, all of source 1 not person a 1-6??
+    - Print Santa: x, giftee: y because shared fandom [thing], gift options:
+- Stop if 0 compats
+- Run it back:
+    - Put people back if not happy with, typing name 1 then name 2 resets the 4 dfs
+- Print compatible
+    - Warning message for if anyone left now has 1-2 compatible
+- And a line for manual intervention
+    - And other prefs
+
+- Random hell scape
+- Multiply total pairings: if under threshold infinite loop generate dfs store valid ones in a list
+    - If over, start with lowest names and randomly pick one going up to people w most. If at any point 0 then reset
+        - If hits end ping « manual fix needed » explain person problem
+
+- Second round hell for mults
+- Only look at separate df??
+    - Need to consider 3 entries aka 2 in df, maybe put it as also name cannot be the same, OR put them in their own blacklist??? lmfao
+    - Check dupes also!! Against tracker so not giving same person 2+ gifts
 
 
 
