@@ -1,79 +1,147 @@
 library(tidyverse)
 library(readxl)
+library(english)
 rm(list = ls())
 
 # prep --------------------------------------------------------------------
 
 og <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC Secret Santa Creative Fanwork Exchange 2024.xlsx")
-match <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC 2024 Secret Santa Tracker.xlsx", sheet = "Track")
-match <- match[,c(1,3,6)]
+og <- og %>%
+  rename(Discord_username = `Discord username`)
+og <- og[-18,]
+  
+types_list <- c("Art",
+                "Remix art",
+                "Creative writing",
+                "Other writing",
+                "Craft or physical piece",
+                "Audio",
+                "Other")
+
+gift_give_list <- paste0("gift_give_type (",
+                        types_list,
+                        ")")
+
+gift_receive_list <- paste0("gift_receive_type (",
+                         types_list,
+                         ")")
 
 # Matches -----------------------------------------------------------------
 
 
-final_match_csv <- NULL
+
+
+
+
+
+match <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC 2024 Secret Santa Tracker.xlsx", sheet = "Track")
+match <- match[,c(1,3,6)]
 
 # Emails ------------------------------------------------------------------
 
-email_csv <- NULL
-
-email_ctrl_c_ctrl_v_csv <- function(og, final_match_csv) {
-  #pull name
-  #is name in email_csv? make sure no dupes
-  greet <- paste("Hi ", name, ", this is an update on MSAC's Secret Santa Gift Exchange! 🎅 We have your giftee information ready:")
-  if ("2") { #check if in final_match_csv twice. if so:
-    twice <- "\n\nWhen filling out the signup you said you'd be down to do 2x Secret Santas, so you'll create gifts for *two* giftees and you'll receive *two* gifts!"
-    
-    #go once
-    #pull giftee 1 name
-    #pull giftee 1 charas -- list
-    #pull giftee 1 fandoms -- list
-    first_message_twice <- paste("\n\n\n✨ Your first giftee is: **", giftee_1_name,"**")
-    first_charas_fandos <- paste()
-    #pull giftee 1 types -- list
-    #format pull types
-    first_happyto <- paste("\n\nThey're happy to receive gifts of these types:", first_giftee_types_formatted)
-    #pull pref
-    #if pref exists:
-    first_pref <- paste("\n\nAny preferences they had:", "*", first_giftee_prefs, "*")
-    
-    #go twice
-    
-    
-    
-    
-    
-    
-    
-    
-    custom <- NULL
-  }
-  else {
+email_ctrl_c_ctrl_v_csv <- function(row) {
+  print("STARTING NEW")
+  name = row[4]
+  print(name)
+  if (name %in% email_csv[1]) next #no dupes
   
-    
-    
-    
-    
-    
-    
-    
-    custom <- NULL
+  greet <- paste0("Hi ", name, ", this is an update on MSAC's Secret Santa Gift Exchange! 🎅 We have your giftee information ready:")
+  
+  just_matches <- match %>%
+    filter (Santa == name)
+  print(just_matches)
+  
+  santa_count <- nrow(just_matches)
+  print(santa_count)
+  if (santa_count > 1) { #check if in final_match_csv twice. if so:
+    mult <- paste("\n\nWhen filling out the signup you said you'd be down to do",
+                  santa_count,
+                  "x Secret Santas, so you'll create gifts for *",
+                  as.english(santa_count),
+                  "* giftees and you'll receive *",
+                  as.english(santa_count),
+                  "* gifts!")
   }
-  close <- "And now you have all the info you need to get creating!! 🖊️ You only gotta make 1 \"thing\" per person, pick any character from their wishlist and do your best!
-As a reminder you have until **December 21st to finish your gift(s)** *unless* you're creating a craft/physical piece, in which case you'll have until Dec 8th to finish. We'll **check in on Dec 6th** to make sure you feel like you're on track to have your gift ready and again on the 21st to confirm you're done. More info about how to share your creation with your giftee at checkin! 🎁
+  
+  custom_all <- NULL
+  
+  for (i in 1:santa_count) {
+    if (santa_count > 1) {
+      xth <- paste0("\n\n\n✨ Your ", ordinal(i), " giftee is:")
+    }
+    else {
+      xth <- "\n\n\n✨ Your giftee is:"
+    }
+    
+    giftee_name <- just_matches$Giftee[i]
+    print(giftee_name)
+    giftee_df <- og %>%
+      filter (Discord_username == giftee_name)
 
-Thanks for participating, we're super excited to see what everyone whips up :D
+    giftee_charas <- giftee_df %>% ##need to make this into a list??
+      select(c("Character_1",
+               "Character_2",
+               "Character_3",
+               "Character_4",
+               "Character_5",
+               "Character_6"))
+    giftee_charas <- unlist(giftee_charas)
+    giftee_fandoms <- giftee_df %>%
+      select(c("Source_1",
+               "Source_2",
+               "Source_3",
+               "Source_4",
+               "Source_5",
+               "Source_6"))
+    giftee_fandoms <- unlist(giftee_fandoms)
+    
+    message_twice <- paste(xth, "**", giftee_name,"**")
 
-We know this was a lot,,,, have any questions, concerns, have you changed your username? Feel free to reach out to the person you dmed you this or by [contact form](<https://tally.so/r/m6QvW5>)
+    charas_fandos <- paste0("> ", giftee_charas, ": ", giftee_fandoms, collapse = "\n")
+    charas_fandos <- paste("\n\nHere are the six characters and the source material that they wrote on their wishlist in order:\n",
+                           charas_fandos)
 
-# IMPORTANT:
-To confirm you've received the info and you're still interested and available, please reply to this message with the name of your giftee(s) or react to this message with the first letter of their username(s) within 72 hours, otherwise we'll assume you can't participate and have dropped out and we'll go fix santa-giftee pairings'"
+    types_index <- giftee_df %>%
+      select(c(gift_receive_list))
+    types_index <- unlist(types_index)
+    types <- types_list[types_index]
+    giftee_types_formatted <- paste0("• ", types, collapse = "\n")
+    happyto <- paste("\n\nThey're happy to receive gifts of these types:\n", giftee_types_formatted)
+
+    pref_pull <- giftee_df %>%
+      select(receive_pref)
+    pref_pull <- unlist(pref_pull)
+    if (!is.na(pref_pull)) {
+      pref <- paste0("\n\nAny preferences they had:\n", "*", pref_pull, "*")
+      }
+    
+    custom <- paste(message_twice,
+                    charas_fandos,
+                    happyto,
+                    pref)
+    custom_all <- paste(custom_all, custom)
+  }
+
+  close <- paste0("\n\n\nAnd now you have all the info you need to get creating!! 🖊️ You only gotta make 1 \"thing\" per person, pick any character from their wishlist and do your best!",
+  "\nAs a reminder you have until **December 21st to finish your gift(s)** *unless* you're creating a craft/physical piece, in which case you'll have until Dec 8th to finish. We'll **check in on Dec 6th** to make sure you feel like you're on track to have your gift ready and again on the 21st to confirm you're done. More info about how to share your creation with your giftee at checkin! 🎁",
+  "\n\nThanks for participating, we're super excited to see what everyone whips up :D",
+  "\n\nWe know this was a lot,,,, have any questions, concerns, have you changed your username? Feel free to reach out to the person you dmed you this or by [contact form](<https://tally.so/r/m6QvW5>)",
+  "\n\n# IMPORTANT:",
+  "\nTo confirm you've received the info and you're still interested and available, please reply to this message with the name of your giftee(s) or react to this message with the first letter of their username(s) within 72 hours, otherwise we'll assume you can't participate and have dropped out and we'll go fix santa-giftee pairings'")
   
   concat_message <- paste(
     greet,
-    custom,
+    custom_all,
     close
   )
-  
-  return (concat_message)
+  print(concat_message)
+  return(c(name, concat_message))
 }
+
+email_csv <- data.frame(Santa = character(),
+                        Message = character(),
+                        stringsAsFactors = FALSE)
+email_csv <- t(apply(og, 1, email_ctrl_c_ctrl_v_csv))
+email_csv <- data.frame(Santa = email_csv[, 1], Message = email_csv[, 2], stringsAsFactors = FALSE)
+
+write_csv(email_csv, "/Users/weeb/Downloads/*data proj/Santa/export.csv")
