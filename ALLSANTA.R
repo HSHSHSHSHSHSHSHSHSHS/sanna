@@ -7,7 +7,8 @@ rm(list = ls())
 
 og <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC Secret Santa Creative Fanwork Exchange 2024.xlsx")
 og <- og %>%
-  rename(Discord_username = `Discord username`)
+  rename(Discord_username = `Discord username`) %>%
+  rename(`gift_give_type (Other)` = `gift_give_type (Other - Please specify)`)
 og <- og[-18,]
   
 types_list <- c("Art",
@@ -26,49 +27,119 @@ gift_receive_list <- paste0("gift_receive_type (",
                          types_list,
                          ")")
 
-# Matches -----------------------------------------------------------------
+# Matches prep -----------------------------------------------------------------
+
+num_participants = length(unique(og$Discord_username))
+unique_participants = unique(og$Discord_username)
+
+## SETTING UP
+all_santas <- data.frame(Santa = rep(NA,num_participants),
+                         Fandoms = rep(NA,num_participants),
+                         Entries = rep(NA, num_participants))
+for (type in types_list) {
+  all_santas[[type]] <- NA
+}
+all_santas$Santa = og$Discord_username
+all_santas$Fandoms = paste(og$Source_1,
+                           og$Source_2,
+                           og$Source_3,
+                           og$Source_4,
+                           og$Source_5,
+                           og$Source_6,
+                           sep = ";.,"
+                           )
+all_santas$Entries = og$entries_count
+
+all_giftees <- all_santas %>%
+  rename(Giftee = Santa)
+
+all_santas[4:10] = og[c(gift_give_list)]
+all_giftees[4:10] = og[c(gift_receive_list)]
+
+## BLACKIST
+blacklist <- data.frame(Santa = og$Discord_username,
+                        Blacklist = rep(NA, num_participants))
+
+#manually add to blacklist
+
+## CREATING POTENTIAL MATCHES
+options <- data.frame(Santa = og$Discord_username) #df, col 1 is santa cols 2-n are giftee names w TF
+for (user in unique_participants) {
+  options[[user]] <- NA
+}
+
+option_maker <- function(row){
+  person <- row[1]
+  print(person)
+  
+  row_name <- names(row)
+  
+  types_index <- og %>%
+    filter(Discord_username == person) %>%
+    select(c(gift_give_list)) %>%
+    unlist()
+  give_types <- types_list[types_index]
+  
+  #compatible give/receive
+  give_get <- function(col){
+    returner <- NA
+    
+    giftee <- names(row)[col]
+    print(paste("Giftee:", giftee))
+    
+    giftee_types_index <- og %>%
+      filter(Discord_username == giftee) %>%
+      select(c(gift_receive_list)) %>%
+      unlist()
+    get_types <- types_list[giftee_types_index]
+    
+    print(paste("Get types:", paste(get_types, collapse = ", ")))
+    print(paste("Give types:", paste(give_types, collapse = ", ")))
+    
+
+    if (!any(get_types %in% give_types)) {
+      returner <- FALSE
+      print(paste("Setting", giftee, "to FALSE"))
+    }
+    
+    return(returner)
+  }
+
+  for (col_idx in seq_along(row)[-1]) {
+    row[col_idx] <- give_get(col_idx)
+  }
+  
+  #making sure not same person
+  col_index <- which(row_name == person)
+  if (length(col_index) > 0) {
+    row[col_index] <- FALSE
+  }
+  
+  #not in blacklist
+  blacklist_entries <- blacklist$Blacklist[blacklist$Santa == person]
+  blacklist_entries <- blacklist_entries[!is.na(blacklist_entries)]
+  
+  if (length(blacklist_entries) > 0) {
+    #print(blacklist_entries)
+    row[which(row_name %in% blacklist_entries)] <- FALSE
+  }
+
+  return(row)
+}
+
+options <- as.data.frame(t(apply(options, 1, option_maker)))
+
+# WIP bit MATCH THING -----------------------------------------------------------------
+
+## MATCHING
+match <- data.frame(Santa = og$Discord_username)
 
 
-Input CSV
-- Name
-- What they give (cols, TF)
-- What they get (cols, TF)
-- All sources in a list w commas to break
-- Notes on give prefs
-
-Script (R)
-- Any excludes?
-    - Create a new df (list w commas to break), this person won’t be matched with any names in that column
-- Create a new df (empty) tracker
-    - Cols Santa -> giftee
-- Create a new df  (all Santas), new df (all giftees)
-- Create a df where col 1 is Santa col 2 is all compatible (based on give receive align and not in blacklist
-
-- For row in compatinle: for thing in list, if thing in [any other row] and give[index] true and receive[index]true, new df remove row where x2 and append to tracker
-    - And remove from compatible, name and row
-    - Probably go in fandom order, all of source 1 not person a 1-6??
-    - Print Santa: x, giftee: y because shared fandom [thing], gift options:
-- Stop if 0 compats
-- Run it back:
-    - Put people back if not happy with, typing name 1 then name 2 resets the 4 dfs
-- Print compatible
-    - Warning message for if anyone left now has 1-2 compatible
-- And a line for manual intervention
-    - And other prefs
-
-- Random hell scape
-- Multiply total pairings: if under threshold infinite loop generate dfs store valid ones in a list
-    - If over, start with lowest names and randomly pick one going up to people w most. If at any point 0 then reset
-        - If hits end ping « manual fix needed » explain person problem
-
-- Second round hell for mults
-- Only look at separate df??
-    - Need to consider 3 entries aka 2 in df, maybe put it as also name cannot be the same, OR put them in their own blacklist??? lmfao
-    - Check dupes also!! Against tracker so not giving same person 2+ gifts
+remaining_santas <- all_santas$Santa
+remaining_giftees <- all_giftees$Giftee
 
 
-
-
+##
 match <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC 2024 Secret Santa Tracker.xlsx", sheet = "Track")
 match <- match[,c(1,3,6)]
 
@@ -179,4 +250,4 @@ email_csv <- data.frame(Santa = character(),
 email_csv <- t(apply(og, 1, email_ctrl_c_ctrl_v_csv))
 email_csv <- data.frame(Santa = email_csv[, 1], Message = email_csv[, 2], stringsAsFactors = FALSE)
 
-write_csv(email_csv, "/Users/weeb/Downloads/*data proj/Santa/export.csv")
+#write_csv(email_csv, "/Users/weeb/Downloads/*data proj/Santa/export.csv")
