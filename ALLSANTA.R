@@ -146,10 +146,7 @@ start_santas <- apply(all_santas, 1, add_mult_entries) %>%
 start_giftees <- start_santas
 
 
-# MATCH THING -----------------------------------------------------------------
-
-##seed
-set.seed(1) 
+# MATCH THING ----------------------------------------------------------------
 
 match <- data.frame(Santa = character(),
                     Giftee = character())
@@ -169,9 +166,16 @@ fandom_match <- function(santas,
                          match){
   randlist <- sample(santas$name)
 
+  clean_fandom <- function(fandom_string) {
+    cleaned_string <- gsub("[^a-zA-Z]", "", toupper(fandom_string))
+    return(cleaned_string)
+  }
+  
   for(i in randlist){
     i_fandoms <- all_santas$Fandoms[all_santas$Santa == i]
     i_fandoms <- unlist(str_split(i_fandoms, horrible_sep))
+    i_fandoms <- clean_fandom(i_fandoms)
+    
     print(i)
     #print(i_fandoms)
     
@@ -196,6 +200,8 @@ fandom_match <- function(santas,
       
       e_fandoms <- all_santas$Fandoms[all_santas$Santa == e]
       e_fandoms <- unlist(str_split(e_fandoms, horrible_sep))
+      e_fandoms <- clean_fandom(e_fandoms)
+
       print(e)
       #print(e_fandoms)
       
