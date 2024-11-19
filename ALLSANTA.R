@@ -1,6 +1,7 @@
 library(tidyverse)
 library(readxl)
 library(english)
+library(stringr)
 rm(list = ls())
 
 # prep --------------------------------------------------------------------
@@ -28,6 +29,7 @@ gift_receive_list <- paste0("gift_receive_type (",
                          ")")
 
 # Matches prep -----------------------------------------------------------------
+horrible_sep = ";.,"
 
 num_participants = length(unique(og$Discord_username))
 unique_participants = unique(og$Discord_username)
@@ -46,7 +48,7 @@ all_santas$Fandoms = paste(og$Source_1,
                            og$Source_4,
                            og$Source_5,
                            og$Source_6,
-                           sep = ";.,"
+                           sep = horrible_sep
                            )
 all_santas$Entries = og$entries_count
 
@@ -60,7 +62,7 @@ all_giftees[4:10] = og[c(gift_receive_list)]
 blacklist <- data.frame(Santa = og$Discord_username,
                         Blacklist = rep(NA, num_participants))
 
-#manually add to blacklist
+#blacklist goes here
 
 ## CREATING POTENTIAL MATCHES
 options <- data.frame(Santa = og$Discord_username) #df, col 1 is santa cols 2-n are giftee names w TF
@@ -79,10 +81,11 @@ option_maker <- function(row){
     select(c(gift_give_list)) %>%
     unlist()
   give_types <- types_list[types_index]
+  print(paste("Give types:", paste(give_types, collapse = ", ")))
   
   #compatible give/receive
   give_get <- function(col){
-    returner <- NA
+    returner <- TRUE
     
     giftee <- names(row)[col]
     print(paste("Giftee:", giftee))
@@ -94,7 +97,6 @@ option_maker <- function(row){
     get_types <- types_list[giftee_types_index]
     
     print(paste("Get types:", paste(get_types, collapse = ", ")))
-    print(paste("Give types:", paste(give_types, collapse = ", ")))
     
 
     if (!any(get_types %in% give_types)) {
@@ -129,19 +131,252 @@ option_maker <- function(row){
 
 options <- as.data.frame(t(apply(options, 1, option_maker)))
 
-# WIP bit MATCH THING -----------------------------------------------------------------
 
-## MATCHING
-match <- data.frame(Santa = og$Discord_username)
+## COLS FOR MULT ENTRIES
+
+add_mult_entries <- function(row) {
+  x = data.frame(name = rep(row[1], row[3]))
+  return(x)
+}
+
+# Apply the function and combine results into a single data frame
+start_santas <- apply(all_santas, 1, add_mult_entries) %>%
+  bind_rows()
+
+start_giftees <- start_santas
 
 
-remaining_santas <- all_santas$Santa
-remaining_giftees <- all_giftees$Giftee
+# MATCH THING -----------------------------------------------------------------
 
+##seed
+set.seed(1) 
+
+match <- data.frame(Santa = character(),
+                    Giftee = character())
+
+remaining_santas <- start_santas
+remaining_giftees <- start_giftees
+
+## FANDOM
+
+temp_remaining_santas <- remaining_santas
+temp_remaining_giftees <- remaining_giftees
+temp_match <- match
+#remember to do like after split, so feh caught by fe
+
+fandom_match <- function(santas,
+                         giftees,
+                         match){
+  randlist <- sample(santas$name)
+
+  for(i in randlist){
+    i_fandoms <- all_santas$Fandoms[all_santas$Santa == i]
+    i_fandoms <- unlist(str_split(i_fandoms, horrible_sep))
+    print(i)
+    #print(i_fandoms)
+    
+    elist <- sample(giftees$name)
+    print(elist)
+  
+    for(e in elist){
+      
+      #check not in blacklist
+      if(options[options$Santa == i, e] == FALSE){
+        print(paste(e, "not viable giftee for", i))
+        next
+      }
+      if(length(match$Giftee[match$Santa == i]) > 0 &&
+         i %in% match$Santa){
+        temp_filter <- match[match$Santa == i, "Giftee"]
+        if(e %in% temp_filter){
+          print(paste(e, "already giftee for", i))
+          next
+        }
+      }
+      
+      e_fandoms <- all_santas$Fandoms[all_santas$Santa == e]
+      e_fandoms <- unlist(str_split(e_fandoms, horrible_sep))
+      print(e)
+      #print(e_fandoms)
+      
+      if(any(i_fandoms %in% e_fandoms)){
+        match[nrow(match)+1, ] = c(i,e)
+        santas <- santas %>%
+          filter(!(name == i & row_number() == which(name == i)[1]))
+        giftees <- giftees %>%
+          filter(!(name == e & row_number() == which(name == e)[1]))
+        
+        print(paste(i, "will make something for", e, "because of shared fandom"))
+        break
+      }
+      
+    }
+  }
+  temp <- list(santas,
+               giftees,
+               match)
+  
+  print("Success")
+  return(temp)
+}
+
+temp_fandom <- fandom_match(temp_remaining_santas,
+                            temp_remaining_giftees,
+                            temp_match)
+temp_remaining_santas <- temp_fandom[[1]]
+temp_remaining_giftees <- temp_fandom[[2]]
+temp_match <- temp_fandom[[3]]
+temp_match
+
+## VERIFICATION
+
+#any low counts?
+did_you_break_it <- function(santa_df,
+                             giftee_df,
+                             match_df
+                             ){
+  #in future might want to check there's a valid santa for every giftee too
+  for(santa in santa_df$name){
+    santa_row <- options[options$Santa == santa, -1]
+    remaining_options <- colnames(options)[-1][santa_row == TRUE]
+    remaining_options <- remaining_options[remaining_options %in% giftee_df$name]
+    already_matched <- match_df$Giftee[match_df$Santa == santa]
+    remaining_options <- remaining_options[!remaining_options %in% already_matched]
+    
+    if(length(remaining_options) == 0){
+      print(paste("Warning!!!!!", santa, "has NO valid options left!"))
+    }
+    else if(length(remaining_options) < 3){
+      print(paste(santa, "only has these options left:", remaining_options))
+    }
+  }
+  
+  for(giftee in giftee_df$name){
+    giftee_col <- options[, giftee]
+    remaining_elves <- options[1, giftee_col == TRUE]
+    remaining_elves <- remaining_elves[remaining_elves %in% santa_df$name]
+    already_matched <- match_df$Santa[match_df$Giftee == giftee]
+    remaining_elves <- remaining_elves[!remaining_elves %in% already_matched]
+    
+    if(length(remaining_options) == 0){
+      print(paste("Warning!!!!!", giftee, "has NO valid santas left!"))
+    }
+    else if(length(remaining_options) < 3){
+      print(paste(giftee, "only has these santas left:", remaining_elves))
+    }
+  }
+  
+}
+
+did_you_break_it(temp_remaining_santas, temp_remaining_giftees, temp_match)
+
+#deletion restoration
+kill_the_match <- function(match_df, santa_df, giftee_df, name1, name2) {
+  row <- which(match_df[, 1] == name1 & match_df[, 2] == name2)
+  
+  if (length(row) > 0) {
+    print(paste(name1, "->", name2, "found"))
+    
+    match_df <- match_df[-row, ]
+    santa_df <- rbind(santa_df, match_df[row, 1])
+    giftee_df <- rbind(giftee_df, match_df[row, 2])
+    
+    print(paste(name1, "->", name2, "removed"))
+  }
+  
+  else {
+    print(paste(name1, "->", name2, "not found"))
+  }
+  
+  edited <- list(match_df, santa_df, giftee_df)
+  return(edited)
+}
+
+edits <- kill_the_match(temp_match,
+               temp_remaining_santas,
+               temp_remaining_giftees,
+               "santa",
+               "giftee")
+edit_match <- edits[[1]]
+edit_santa <- edits[[2]]
+edit_giftee <- edits[[3]]
+
+
+## MANUAL ADJUSTING GOES HERE
+
+
+
+## MERGE ONCE HAPPY
+remaining_santas <- temp_remaining_santas
+remaining_giftees <- temp_remaining_giftees
+current_match <- temp_match
+
+
+## RANDOM
+rando_match <- function(santas,
+                         giftees,
+                         match){
+  randlist <- sample(santas$name)
+  
+  for(i in randlist){
+    print(i)
+
+    elist <- na.omit(sample(giftees$name))
+    print(elist)
+    
+    elist <- elist[sapply(elist, function(e) {
+      # Check if the cell in 'options' where row = i and column = e is TRUE
+      valid_cell <- options[options$Santa == i, e] == TRUE
+      
+      # Ensure there is no match where Santa = i and Giftee = e
+      no_match <- !(any(match$Santa == i & match$Giftee == e))
+      
+      valid_cell && no_match
+    })]
+    print(elist)
+    
+    if (length(elist) == 0){
+      print("Oh no! 0 giftees possible for santa. Run me again with better luck?")
+      return("")
+    }
+    
+    for(e in elist){
+      
+      #matched
+      match[nrow(match)+1, ] = c(i,e)
+      santas <- santas %>%
+        filter(!(name == i & row_number() == which(name == i)[1]))
+      giftees <- giftees %>%
+        filter(!(name == e & row_number() == which(name == e)[1]))
+      
+      print(paste(i, "will make something for", e))
+      break
+      }
+      
+  }
+  
+  final_match <- match
+  print("Success")
+  return(final_match)
+}
+
+my_match <- rando_match(remaining_santas,
+                          remaining_giftees,
+                          current_match)
+
+
+## MANUAL ADJUSTING AGAIN
+
+
+
+## MERGE AGAIN ONCE HAPPY
+match <- my_match
+
+match
 
 ##
-match <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC 2024 Secret Santa Tracker.xlsx", sheet = "Track")
-match <- match[,c(1,3,6)]
+# match <- read_xlsx("/Users/weeb/Downloads/*data proj/Santa/MSAC 2024 Secret Santa Tracker.xlsx", sheet = "Track")
+# match <- match[,c(1,3,6)]
 
 # Emails ------------------------------------------------------------------
 
