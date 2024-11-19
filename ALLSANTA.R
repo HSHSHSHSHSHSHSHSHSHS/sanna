@@ -460,12 +460,13 @@ email_ctrl_c_ctrl_v_csv <- function(row) {
     pref_pull <- unlist(pref_pull)
     if (!is.na(pref_pull)) {
       pref <- paste0("\n\nAny preferences they had:\n", "*", pref_pull, "*")
+      happyto <- paste(happyto, pref)
       }
     
     custom <- paste(message_twice,
                     charas_fandos,
-                    happyto,
-                    pref)
+                    happyto
+                    )
     custom_all <- paste(custom_all, custom)
   }
 
