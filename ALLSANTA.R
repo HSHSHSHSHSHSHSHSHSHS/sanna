@@ -6,11 +6,13 @@ rm(list = ls())
 
 # prep --------------------------------------------------------------------
 
+#change this to point to ur input. Must be formatted like example input excel.
 og <- read_xlsx("excel.xlsx")
-og <- og %>%
-  rename(Discord_username = `Discord username`) %>%
-  rename(`gift_give_type (Other)` = `gift_give_type (Other - Please specify)`)
-og <- og[-18,]
+#cleanup I needed for my file
+#og <- og %>%
+#  rename(Discord_username = `Discord username`) %>%
+#  rename(`gift_give_type (Other)` = `gift_give_type (Other - Please specify)`)
+#og <- og[-18,]
   
 types_list <- c("Art",
                 "Remix art",
@@ -29,12 +31,14 @@ gift_receive_list <- paste0("gift_receive_type (",
                          ")")
 
 # Matches prep -----------------------------------------------------------------
-horrible_sep = ";.,"
+horrible_sep = ";.," #for consistent joining and splitting
 
 num_participants = length(unique(og$Discord_username))
 unique_participants = unique(og$Discord_username)
 
 ## SETTING UP
+#creates a summary view of all unique santas + giftees for matching purposes
+
 all_santas <- data.frame(Santa = rep(NA,num_participants),
                          Fandoms = rep(NA,num_participants),
                          Entries = rep(NA, num_participants))
@@ -62,7 +66,7 @@ all_giftees[4:10] = og[c(gift_receive_list)]
 blacklist <- data.frame(Santa = og$Discord_username,
                         Blacklist = rep(NA, num_participants))
 
-#blacklist goes here
+#manual blacklist adding goes here
 
 ## CREATING POTENTIAL MATCHES
 options <- data.frame(Santa = og$Discord_username) #df, col 1 is santa cols 2-n are giftee names w TF
@@ -129,11 +133,12 @@ option_maker <- function(row){
   return(row)
 }
 
+#will refer back to options df for valid matches
 options <- as.data.frame(t(apply(options, 1, option_maker)))
 
 
 ## COLS FOR MULT ENTRIES
-
+#add multiple entries again to all santa *entries*
 add_mult_entries <- function(row) {
   x = data.frame(name = rep(row[1], row[3]))
   return(x)
@@ -155,11 +160,11 @@ remaining_santas <- start_santas
 remaining_giftees <- start_giftees
 
 ## FANDOM
+#prioritize people with fandoms in common, deal with rest in later functions
 
 temp_remaining_santas <- remaining_santas
 temp_remaining_giftees <- remaining_giftees
 temp_match <- match
-#remember to do like after split, so feh caught by fe
 
 fandom_match <- function(santas,
                          giftees,
@@ -241,7 +246,7 @@ did_you_break_it <- function(santa_df,
                              giftee_df,
                              match_df
                              ){
-  #in future might want to check there's a valid santa for every giftee too
+
   for(santa in santa_df$name){
     santa_row <- options[options$Santa == santa, -1]
     remaining_options <- colnames(options)[-1][santa_row == TRUE]
@@ -319,6 +324,8 @@ current_match <- temp_match
 
 
 ## RANDOM
+#assigning the remaining santas + giftees to each other
+
 rando_match <- function(santas,
                          giftees,
                          match){
@@ -421,7 +428,7 @@ email_ctrl_c_ctrl_v_csv <- function(row) {
     giftee_df <- og %>%
       filter (Discord_username == giftee_name)
 
-    giftee_charas <- giftee_df %>% ##need to make this into a list??
+    giftee_charas <- giftee_df %>%
       select(c("Character_1",
                "Character_2",
                "Character_3",
