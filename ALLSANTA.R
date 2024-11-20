@@ -495,4 +495,4 @@ email_csv <- data.frame(Santa = character(),
 email_csv <- t(apply(og, 1, email_ctrl_c_ctrl_v_csv))
 email_csv <- data.frame(Santa = email_csv[, 1], Message = email_csv[, 2], stringsAsFactors = FALSE)
 
-#write_csv(email_csv, "/Users/weeb/Downloads/*data proj/Santa/export.csv")
+#write_csv(email_csv, "/whereyouwanttosave.csv")
