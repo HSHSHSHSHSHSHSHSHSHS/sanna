@@ -39,34 +39,61 @@ unique_participants = unique(og$Discord_username)
 ## SETTING UP
 #creates a summary view of all unique santas + giftees for matching purposes
 
-all_santas <- data.frame(Santa = rep(NA,num_participants),
-                         Fandoms = rep(NA,num_participants),
-                         Entries = rep(NA, num_participants))
+fandoms = paste(og$Source_1,
+                og$Source_2,
+                og$Source_3,
+                og$Source_4,
+                og$Source_5,
+                og$Source_6,
+                sep = horrible_sep
+)
+all_santas <- data.frame(Santa = og$Discord_username,
+                         Fandoms = fandoms,
+                         Entries = og$entries_count)
 for (type in types_list) {
   all_santas[[type]] <- NA
 }
-all_santas$Santa = og$Discord_username
-all_santas$Fandoms = paste(og$Source_1,
-                           og$Source_2,
-                           og$Source_3,
-                           og$Source_4,
-                           og$Source_5,
-                           og$Source_6,
-                           sep = horrible_sep
-                           )
-all_santas$Entries = og$entries_count
 
 all_giftees <- all_santas %>%
   rename(Giftee = Santa)
 
-all_santas[4:10] = og[c(gift_give_list)]
-all_giftees[4:10] = og[c(gift_receive_list)]
+#future proofing in case more or less gift types
+start <- which(colnames(all_santas) %in% types_list)[1]
+end <- start + length(types_list) - 1
+all_santas[start:end] = og[c(gift_give_list)]
+all_giftees[start:end] = og[c(gift_receive_list)]
+
+#all_giftees
+# Giftee    Fandoms
+# 1 a       GG;.,Blue;.,Sailor Moon;.,Zelda;.,Xenoblade;.,FGO
+# 2 b       Vocaloid;.,Pokemon;.,Arknights;.,Conan;.,Bocchi;.,MDZS
+# 3 c       ...
+# 4 d       ...
+# 5 e       ...
+# 6 f       ...
+#   Entries  Art Remix art Creative writing Other writing Craft or physical piece Audio Other
+# 1       1 TRUE     FALSE             TRUE          TRUE                   FALSE  TRUE FALSE
+# 2       2 TRUE      TRUE            FALSE         FALSE                    TRUE FALSE FALSE
+# 3       1 TRUE      TRUE            FALSE         FALSE                    TRUE FALSE FALSE
+# 4       1 TRUE     FALSE            FALSE         FALSE                   FALSE FALSE FALSE
+# 5       2 TRUE      TRUE             TRUE         FALSE                   FALSE FALSE FALSE
+# 6       3 TRUE     FALSE            FALSE         FALSE                    TRUE  TRUE  TRUE
+
 
 ## BLACKIST
 blacklist <- data.frame(Santa = og$Discord_username,
                         Blacklist = rep(NA, num_participants))
 
-#manual blacklist adding goes here
+#manual blacklist adding goes here 
+
+#blacklist
+#           Santa     Blacklist
+# 1             a      <NA>
+# 2             b      x, y
+# 3             c      <NA>
+# 4             d      <NA>
+# 5             e      <NA>
+
 
 ## CREATING POTENTIAL MATCHES
 options <- data.frame(Santa = og$Discord_username) #df, col 1 is santa cols 2-n are giftee names w TF
@@ -79,46 +106,47 @@ option_maker <- function(row){
   print(person)
   
   row_name <- names(row)
+
+  get_compatible_types <- function(username, types) {
+    compatible <- og %>%
+      filter(Discord_username == username) %>%
+      select(c(types)) %>%
+      unlist()
+    return(types_list[compatible])
+  }
   
-  types_index <- og %>%
-    filter(Discord_username == person) %>%
-    select(c(gift_give_list)) %>%
-    unlist()
-  give_types <- types_list[types_index]
+  give_types <- get_compatible_types(person, gift_give_list)
   print(paste("Give types:", paste(give_types, collapse = ", ")))
   
   #compatible give/receive
   give_get <- function(col){
-    returner <- TRUE
-    
+
     giftee <- names(row)[col]
     print(paste("Giftee:", giftee))
     
-    giftee_types_index <- og %>%
-      filter(Discord_username == giftee) %>%
-      select(c(gift_receive_list)) %>%
-      unlist()
-    get_types <- types_list[giftee_types_index]
+    #making sure not same person
+    if(giftee == person){
+      print("This is the same person. Setting to FALSE")
+      return (FALSE)
+    }
     
+    #viable give -> get check
+    get_types <- get_compatible_types(giftee, gift_receive_list)
+    
+    print(paste("Give types:", paste(give_types, collapse = ", ")))
     print(paste("Get types:", paste(get_types, collapse = ", ")))
     
 
     if (!any(get_types %in% give_types)) {
-      returner <- FALSE
       print(paste("Setting", giftee, "to FALSE"))
     }
     
-    return(returner)
+    return(any(get_types %in% give_types))
   }
 
+  #For each column (giftee), use above to check their compatibility with row (santa)
   for (col_idx in seq_along(row)[-1]) {
     row[col_idx] <- give_get(col_idx)
-  }
-  
-  #making sure not same person
-  col_index <- which(row_name == person)
-  if (length(col_index) > 0) {
-    row[col_index] <- FALSE
   }
   
   #not in blacklist
@@ -126,7 +154,7 @@ option_maker <- function(row){
   blacklist_entries <- blacklist_entries[!is.na(blacklist_entries)]
   
   if (length(blacklist_entries) > 0) {
-    #print(blacklist_entries)
+    print(paste(blacklist_entries, "blacklisted for", person))
     row[which(row_name %in% blacklist_entries)] <- FALSE
   }
 
@@ -135,12 +163,20 @@ option_maker <- function(row){
 
 #will refer back to options df for valid matches
 options <- as.data.frame(t(apply(options, 1, option_maker)))
+# Santa   a         b     c       d     e
+# 1 a    FALSE   FALSE  FALSE   FALSE   TRUE
+# 2 b    FALSE   FALSE   TRUE   FALSE  FALSE
+# 3 c    FALSE    TRUE  FALSE   FALSE  FALSE
+# 4 d     TRUE    TRUE   TRUE   FALSE   TRUE
+# 5 e     TRUE    TRUE   TRUE    TRUE  FALSE
+
 
 
 ## COLS FOR MULT ENTRIES
 #add multiple entries again to all santa *entries*
 add_mult_entries <- function(row) {
   x = data.frame(name = rep(row[1], row[3]))
+  if (row[3]>1) {print(paste(row[1], "added", row[3], "times"))}
   return(x)
 }
 
@@ -153,9 +189,6 @@ start_giftees <- start_santas
 
 # MATCH THING ----------------------------------------------------------------
 
-match <- data.frame(Santa = character(),
-                    Giftee = character())
-
 remaining_santas <- start_santas
 remaining_giftees <- start_giftees
 
@@ -164,7 +197,9 @@ remaining_giftees <- start_giftees
 
 temp_remaining_santas <- remaining_santas
 temp_remaining_giftees <- remaining_giftees
-temp_match <- match
+temp_match <- data.frame(Santa = character(),
+                         Giftee = character())
+
 
 fandom_match <- function(santas,
                          giftees,
@@ -177,12 +212,18 @@ fandom_match <- function(santas,
   }
   
   for(i in randlist){
-    i_fandoms <- all_santas$Fandoms[all_santas$Santa == i]
-    i_fandoms <- unlist(str_split(i_fandoms, horrible_sep))
-    i_fandoms <- clean_fandom(i_fandoms)
+    
+    fandom_ready <- function(x){
+      x_fandoms <- all_santas$Fandoms[all_santas$Santa == x]
+      x_fandoms <- unlist(str_split(x_fandoms, horrible_sep))
+      x_fandoms <- clean_fandom(x_fandoms)
+      return (unique(x_fandoms))
+    }
+    
+    i_fandoms <- fandom_ready(i)
     
     print(i)
-    #print(i_fandoms)
+    print(i_fandoms)
     
     elist <- sample(giftees$name)
     print(elist)
@@ -190,7 +231,7 @@ fandom_match <- function(santas,
     for(e in elist){
       
       #check not in blacklist
-      if(options[options$Santa == i, e] == FALSE){
+      if(!as.logical(options[options$Santa == i, e])){
         print(paste(e, "not viable giftee for", i))
         next
       }
@@ -203,10 +244,7 @@ fandom_match <- function(santas,
         }
       }
       
-      e_fandoms <- all_santas$Fandoms[all_santas$Santa == e]
-      e_fandoms <- unlist(str_split(e_fandoms, horrible_sep))
-      e_fandoms <- clean_fandom(e_fandoms)
-
+      e_fandoms <- fandom_ready(e)
       print(e)
       #print(e_fandoms)
       
@@ -238,6 +276,42 @@ temp_remaining_santas <- temp_fandom[[1]]
 temp_remaining_giftees <- temp_fandom[[2]]
 temp_match <- temp_fandom[[3]]
 temp_match
+#       Santa Giftee
+# 1        j p
+# 2        a k
+# 3        e d
+# 4        p j
+# 5        k a
+# 6        t h
+# 7        t v
+# 8        t b
+#temp_remaining_giftees
+# s
+# s
+# h
+# e
+# t
+# t
+# t
+# f
+# y
+# p
+# i
+# i
+#temp_remaining_santas
+# s
+# s
+# h
+# d
+# f
+# y
+# p
+# i
+# i
+# v
+# b
+# k
+
 
 ## VERIFICATION
 
@@ -269,10 +343,10 @@ did_you_break_it <- function(santa_df,
     already_matched <- match_df$Santa[match_df$Giftee == giftee]
     remaining_elves <- remaining_elves[!remaining_elves %in% already_matched]
     
-    if(length(remaining_options) == 0){
+    if(length(remaining_elves) == 0){
       print(paste("Warning!!!!!", giftee, "has NO valid santas left!"))
     }
-    else if(length(remaining_options) < 3){
+    else if(length(remaining_elves) < 3){
       print(paste(giftee, "only has these santas left:", remaining_elves))
     }
   }
