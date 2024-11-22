@@ -315,15 +315,15 @@ temp_match
 
 ## VERIFICATION
 
-#any low counts?
+#Any low counts?
 did_you_break_it <- function(santa_df,
                              giftee_df,
                              match_df
                              ){
-
+  
   for(santa in santa_df$name){
     santa_row <- options[options$Santa == santa, -1]
-    remaining_options <- colnames(options)[-1][santa_row == TRUE]
+    remaining_options <- colnames(options)[-1][as.logical(santa_row)]
     remaining_options <- remaining_options[remaining_options %in% giftee_df$name]
     already_matched <- match_df$Giftee[match_df$Santa == santa]
     remaining_options <- remaining_options[!remaining_options %in% already_matched]
@@ -338,11 +338,16 @@ did_you_break_it <- function(santa_df,
   
   for(giftee in giftee_df$name){
     giftee_col <- options[, giftee]
-    remaining_elves <- options[1, giftee_col == TRUE]
+    #print(giftee_col)
+    
+    remaining_elves <- options$Santa[as.logical(giftee_col)]
+    #print(remaining_elves)
+    
     remaining_elves <- remaining_elves[remaining_elves %in% santa_df$name]
+
     already_matched <- match_df$Santa[match_df$Giftee == giftee]
     remaining_elves <- remaining_elves[!remaining_elves %in% already_matched]
-    
+
     if(length(remaining_elves) == 0){
       print(paste("Warning!!!!!", giftee, "has NO valid santas left!"))
     }
@@ -354,6 +359,10 @@ did_you_break_it <- function(santa_df,
 }
 
 did_you_break_it(temp_remaining_santas, temp_remaining_giftees, temp_match)
+# [1] "Warning!!!!! s has NO valid santas left!"
+# [1] "Warning!!!!! h has NO valid santas left!"
+# [1] "d only has these santas left: a"
+
 
 #deletion restoration
 kill_the_match <- function(match_df, santa_df, giftee_df, name1, name2) {
@@ -412,11 +421,13 @@ rando_match <- function(santas,
     print(elist)
     
     elist <- elist[sapply(elist, function(e) {
-      # Check if the cell in 'options' where row = i and column = e is TRUE
-      valid_cell <- options[options$Santa == i, e] == TRUE
+      # Is it valid option?
+      valid_cell <- as.logical(options[options$Santa == i, e])
+      print(valid_cell)
       
-      # Ensure there is no match where Santa = i and Giftee = e
+      # Is it already matched?
       no_match <- !(any(match$Santa == i & match$Giftee == e))
+      print(no_match)
       
       valid_cell && no_match
     })]
@@ -424,7 +435,7 @@ rando_match <- function(santas,
     
     if (length(elist) == 0){
       print("Oh no! 0 giftees possible for santa. Run me again with better luck?")
-      return("")
+      return()
     }
     
     for(e in elist){
@@ -460,6 +471,23 @@ my_match <- rando_match(remaining_santas,
 match <- my_match
 
 match
+#       Santa Giftee #first rows are from fandom match!
+# 1        j p
+# 2        a k
+# 3        e d
+# 4        p j
+# 5        k a
+# 6        t h
+# 7        t v
+# 8        t b
+# 9        i p
+# 10       i f             
+# 11       c s             
+# 12       h t                           
+# 13       o e                          
+# 14       e h     
+# 15       y t 
+#...       ...
 
 # Emails ------------------------------------------------------------------
 
@@ -467,7 +495,7 @@ email_ctrl_c_ctrl_v_csv <- function(row) {
   print("STARTING NEW")
   name = row[4]
   print(name)
-  if (name %in% email_csv[1]) next #no dupes
+  if (name %in% email_csv[1]) next #no dupes in case mult entries
   
   greet <- paste0("Hi ", name, ", this is an update on our Secret Santa Gift Exchange! 🎅 We have your giftee information ready:")
   
@@ -508,16 +536,16 @@ email_ctrl_c_ctrl_v_csv <- function(row) {
                "Character_3",
                "Character_4",
                "Character_5",
-               "Character_6"))
-    giftee_charas <- unlist(giftee_charas)
+               "Character_6")) %>%
+      unlist()
     giftee_fandoms <- giftee_df %>%
       select(c("Source_1",
                "Source_2",
                "Source_3",
                "Source_4",
                "Source_5",
-               "Source_6"))
-    giftee_fandoms <- unlist(giftee_fandoms)
+               "Source_6")) %>%
+      unlist()
     
     message_twice <- paste(xth, "**", giftee_name,"**")
 
@@ -526,15 +554,15 @@ email_ctrl_c_ctrl_v_csv <- function(row) {
                            charas_fandos)
 
     types_index <- giftee_df %>%
-      select(c(gift_receive_list))
-    types_index <- unlist(types_index)
+      select(c(gift_receive_list)) %>%
+      unlist()
     types <- types_list[types_index]
     giftee_types_formatted <- paste0("• ", types, collapse = "\n")
     happyto <- paste("\n\nThey're happy to receive gifts of these types:\n", giftee_types_formatted)
 
     pref_pull <- giftee_df %>%
-      select(receive_pref)
-    pref_pull <- unlist(pref_pull)
+      select(receive_pref) %>%
+      unlist()
     if (!is.na(pref_pull)) {
       pref <- paste0("\n\nAny preferences they had:\n", "*", pref_pull, "*")
       happyto <- paste(happyto, pref)
